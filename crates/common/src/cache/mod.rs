@@ -49,8 +49,7 @@ use nautilus_core::{
 use nautilus_model::{
     accounts::{Account, AccountAny},
     data::{
-        Bar, BarType, FundingRateUpdate, GreeksData, IndexPriceUpdate, MarkPriceUpdate, QuoteTick,
-        TradeTick, YieldCurveData,
+        Bar, BarType, FundingRateUpdate, IndexPriceUpdate, MarkPriceUpdate, QuoteTick, TradeTick,
     },
     enums::{AggregationSource, OmsType, OrderSide, PositionSide, PriceType, TriggerType},
     identifiers::{
@@ -68,6 +67,8 @@ use nautilus_model::{
 };
 use ustr::Ustr;
 
+#[cfg(feature = "greeks")]
+use crate::greeks::{GreeksData, YieldCurveData};
 use crate::xrate::get_exchange_rate;
 
 /// A common in-memory `Cache` for market and execution related data.
@@ -92,7 +93,9 @@ pub struct Cache {
     index_prices: AHashMap<InstrumentId, VecDeque<IndexPriceUpdate>>,
     funding_rates: AHashMap<InstrumentId, VecDeque<FundingRateUpdate>>,
     bars: AHashMap<BarType, VecDeque<Bar>>,
+    #[cfg(feature = "greeks")]
     greeks: AHashMap<InstrumentId, GreeksData>,
+    #[cfg(feature = "greeks")]
     yield_curves: AHashMap<String, YieldCurveData>,
     accounts: AHashMap<AccountId, AccountAny>,
     orders: AHashMap<ClientOrderId, OrderAny>,
@@ -103,6 +106,35 @@ pub struct Cache {
     pub(crate) defi: crate::defi::cache::DefiCache,
 }
 
+#[cfg(not(feature = "greeks"))]
+impl Debug for Cache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(stringify!(Cache))
+            .field("config", &self.config)
+            .field("index", &self.index)
+            .field("general", &self.general)
+            .field("currencies", &self.currencies)
+            .field("instruments", &self.instruments)
+            .field("synthetics", &self.synthetics)
+            .field("books", &self.books)
+            .field("own_books", &self.own_books)
+            .field("quotes", &self.quotes)
+            .field("trades", &self.trades)
+            .field("mark_xrates", &self.mark_xrates)
+            .field("mark_prices", &self.mark_prices)
+            .field("index_prices", &self.index_prices)
+            .field("funding_rates", &self.funding_rates)
+            .field("bars", &self.bars)
+            .field("accounts", &self.accounts)
+            .field("orders", &self.orders)
+            .field("order_lists", &self.order_lists)
+            .field("positions", &self.positions)
+            .field("position_snapshots", &self.position_snapshots)
+            .finish()
+    }
+}
+
+#[cfg(feature = "greeks")]
 impl Debug for Cache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(stringify!(Cache))
@@ -166,7 +198,9 @@ impl Cache {
             index_prices: AHashMap::new(),
             funding_rates: AHashMap::new(),
             bars: AHashMap::new(),
+            #[cfg(feature = "greeks")]
             greeks: AHashMap::new(),
+            #[cfg(feature = "greeks")]
             yield_curves: AHashMap::new(),
             accounts: AHashMap::new(),
             orders: AHashMap::new(),
@@ -1231,8 +1265,11 @@ impl Cache {
         self.order_lists.clear();
         self.positions.clear();
         self.position_snapshots.clear();
-        self.greeks.clear();
-        self.yield_curves.clear();
+        #[cfg(feature = "greeks")]
+        {
+            self.greeks.clear();
+            self.yield_curves.clear();
+        }
 
         #[cfg(feature = "defi")]
         {
@@ -1577,6 +1614,7 @@ impl Cache {
     /// # Errors
     ///
     /// Returns an error if persisting the greeks data to the backing database fails.
+    #[cfg(feature = "greeks")]
     pub fn add_greeks(&mut self, greeks: GreeksData) -> anyhow::Result<()> {
         log::debug!("Adding `GreeksData` {}", greeks.instrument_id);
 
@@ -1591,6 +1629,7 @@ impl Cache {
     }
 
     /// Gets the greeks data for the `instrument_id`.
+    #[cfg(feature = "greeks")]
     pub fn greeks(&self, instrument_id: &InstrumentId) -> Option<GreeksData> {
         self.greeks.get(instrument_id).cloned()
     }
@@ -1600,6 +1639,7 @@ impl Cache {
     /// # Errors
     ///
     /// Returns an error if persisting the yield curve data to the backing database fails.
+    #[cfg(feature = "greeks")]
     pub fn add_yield_curve(&mut self, yield_curve: YieldCurveData) -> anyhow::Result<()> {
         log::debug!("Adding `YieldCurveData` {}", yield_curve.curve_name);
 
@@ -1615,6 +1655,7 @@ impl Cache {
     }
 
     /// Gets the yield curve for the `key`.
+    #[cfg(feature = "greeks")]
     pub fn yield_curve(&self, key: &str) -> Option<Box<dyn Fn(f64) -> f64>> {
         self.yield_curves.get(key).map(|curve| {
             let curve_clone = curve.clone();

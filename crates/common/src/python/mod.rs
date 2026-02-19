@@ -21,6 +21,8 @@ pub mod clock;
 pub mod custom;
 pub mod enums;
 pub mod fifo;
+#[cfg(all(feature = "greeks", feature = "python"))]
+pub mod greeks;
 pub mod listener;
 pub mod logging;
 pub mod msgbus;
@@ -75,6 +77,28 @@ pub fn common(_: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     #[cfg(feature = "live")]
     m.add_class::<crate::live::listener::MessageBusListener>()?;
+
+    #[cfg(all(feature = "greeks", feature = "python"))]
+    {
+        use nautilus_model::data::ensure_rust_extractor_registered;
+        use nautilus_serialization::ensure_custom_data_registered;
+
+        ensure_custom_data_registered::<crate::greeks::data::GreeksData>();
+        ensure_custom_data_registered::<crate::greeks::data::PortfolioGreeks>();
+        ensure_custom_data_registered::<crate::greeks::data::YieldCurveData>();
+        let _ = ensure_rust_extractor_registered::<crate::greeks::data::GreeksData>();
+        let _ = ensure_rust_extractor_registered::<crate::greeks::data::PortfolioGreeks>();
+        let _ = ensure_rust_extractor_registered::<crate::greeks::data::YieldCurveData>();
+
+        m.add_class::<crate::greeks::data::GreeksData>()?;
+        m.add_class::<crate::greeks::data::PortfolioGreeks>()?;
+        m.add_class::<crate::greeks::data::YieldCurveData>()?;
+        m.add_class::<crate::greeks::data::BlackScholesGreeksResult>()?;
+        m.add_function(wrap_pyfunction!(greeks::py_black_scholes_greeks, m)?)?;
+        m.add_function(wrap_pyfunction!(greeks::py_imply_vol, m)?)?;
+        m.add_function(wrap_pyfunction!(greeks::py_imply_vol_and_greeks, m)?)?;
+        m.add_function(wrap_pyfunction!(greeks::py_refine_vol_and_greeks, m)?)?;
+    }
 
     Ok(())
 }

@@ -21,7 +21,7 @@ name = "nautilus_common"
 crate-type = ["rlib", "staticlib"]
 
 [features]
-default = ["indicators", "rstest"]
+default = ["greeks", "indicators", "rstest"]
 extension-module = [
   "nautilus-core/extension-module",
   "nautilus-model/extension-module",
@@ -41,6 +41,12 @@ python = [
 ]
 live = ["tokio"]
 defi = ["nautilus-model/defi", "alloy-primitives"]
+greeks = [
+  "dep:arrow",
+  "dep:implied-vol",
+  "dep:nautilus-macros",
+  "dep:nautilus-serialization",
+]
 capnp = ["nautilus-serialization/capnp"]
 tracing-bridge = ["tracing", "tracing-subscriber"]
 
@@ -53,6 +59,10 @@ nautilus-core = { workspace = true }
 nautilus-indicators = { workspace = true, optional = true }
 nautilus-model = { workspace = true, features = ["stubs"] }
 nautilus-serialization = { workspace = true, optional = true }
+
+arrow = { workspace = true, optional = true }
+implied-vol = { workspace = true, optional = true }
+nautilus-macros = { path = "../nautilus_macros", optional = true }
 
 ahash = { workspace = true }
 anyhow = { workspace = true }
@@ -83,6 +93,7 @@ tracing = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true }
 
 [dev-dependencies]
+arrow = { workspace = true }
 capnp = { workspace = true }
 criterion = { workspace = true }
 futures = { workspace = true, features = ["executor"] }
@@ -126,3 +137,15 @@ harness = false
 name = "mstr"
 path = "benches/mstr.rs"
 harness = false
+
+[[bench]]
+name = "greeks_criterion"
+path = "benches/greeks_criterion.rs"
+harness = false
+required-features = ["greeks"]
+
+[[bench]]
+name = "black_scholes_simd_criterion"
+path = "benches/black_scholes_simd_criterion.rs"
+harness = false
+required-features = ["greeks"]

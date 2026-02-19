@@ -13,10 +13,12 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
+#![cfg(feature = "greeks")]
+
 use std::hint::black_box;
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use nautilus_model::data::black_scholes::{compute_greeks, compute_iv_and_greeks};
+use nautilus_common::greeks::black_scholes::{compute_greeks, compute_iv_and_greeks};
 
 fn bench_compute_iv_and_greeks_f32(c: &mut Criterion) {
     let mkt_price = 10.45058f32;

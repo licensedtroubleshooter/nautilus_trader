@@ -13,12 +13,12 @@
 //  limitations under the License.
 // -------------------------------------------------------------------------------------------------
 
+#![cfg(feature = "greeks")]
+
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, criterion_group};
-use nautilus_model::data::greeks::{
-    black_scholes_greeks, imply_vol_and_greeks, refine_vol_and_greeks,
-};
+use nautilus_common::greeks::{black_scholes_greeks, imply_vol_and_greeks, refine_vol_and_greeks};
 
 fn bench_black_scholes_greeks_moneyness(c: &mut Criterion) {
     let r = 0.05;
@@ -27,8 +27,6 @@ fn bench_black_scholes_greeks_moneyness(c: &mut Criterion) {
     let k = 100.0;
     let t = 1.0;
 
-    // Test different moneyness levels and call/put - all should have similar timings
-    // since the same code path is executed regardless of moneyness or option type
     let mut group = c.benchmark_group("black_scholes_greeks");
     for (spot, moneyness_label) in [(90.0, "otm"), (100.0, "atm"), (110.0, "itm")] {
         for (is_call, option_type) in [(true, "call"), (false, "put")] {
@@ -64,7 +62,6 @@ fn bench_imply_vol_and_greeks_moneyness(c: &mut Criterion) {
     let mut group = c.benchmark_group("imply_vol_and_greeks");
     for (spot, moneyness_label) in [(90.0, "otm"), (100.0, "atm"), (110.0, "itm")] {
         for (is_call, option_type) in [(true, "call"), (false, "put")] {
-            // Calculate theoretical price for this scenario
             let theoretical_price =
                 black_scholes_greeks(spot, r, cost_of_carry, vol, is_call, k, t).price;
             group.bench_with_input(
@@ -99,10 +96,8 @@ fn bench_refine_vol_and_greeks_moneyness(c: &mut Criterion) {
     let mut group = c.benchmark_group("refine_vol_and_greeks");
     for (spot, moneyness_label) in [(90.0, "otm"), (100.0, "atm"), (110.0, "itm")] {
         for (is_call, option_type) in [(true, "call"), (false, "put")] {
-            // Calculate target price for this scenario
             let target_price =
                 black_scholes_greeks(spot, r, cost_of_carry, initial_vol, is_call, k, t).price;
-            // Use a slightly different initial guess (10% off)
             let initial_guess = if is_call {
                 initial_vol * 1.1
             } else {

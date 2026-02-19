@@ -27,12 +27,9 @@ use nautilus_common::{
     python::{cache::PyCache, clock::PyClock},
 };
 use nautilus_core::UnixNanos;
-use nautilus_model::{
-    data::{
-        Bar, Data, IndexPriceUpdate, MarkPriceUpdate, OrderBookDelta, OrderBookDepth10, QuoteTick,
-        TradeTick, close::InstrumentClose,
-    },
-    python::instruments::pyobject_to_instrument_any,
+use nautilus_model::data::{
+    Bar, Data, IndexPriceUpdate, MarkPriceUpdate, OrderBookDelta, OrderBookDepth10, QuoteTick,
+    TradeTick, close::InstrumentClose,
 };
 use pyo3::{exceptions::PyIOError, prelude::*};
 
@@ -243,74 +240,34 @@ impl StreamingFeatherWriterV2 {
     /// FundingRateUpdate is intentionally not supported and will return an error.
     pub fn write(&self, py: Python, data: Py<PyAny>) -> PyResult<()> {
         // Try to convert from common pyo3 data types
-        if let Ok(quote) = data.extract::<QuoteTick>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::Quote(quote)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write QuoteTick: {e}")));
-        }
-        if let Ok(trade) = data.extract::<TradeTick>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::Trade(trade)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write TradeTick: {e}")));
-        }
-        if let Ok(bar) = data.extract::<Bar>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::Bar(bar)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write Bar: {e}")));
-        }
-        if let Ok(delta) = data.extract::<OrderBookDelta>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::Delta(delta)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write OrderBookDelta: {e}")));
-        }
-        if let Ok(depth) = data.extract::<OrderBookDepth10>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::Depth10(Box::new(depth))).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write OrderBookDepth10: {e}")));
-        }
-        if let Ok(price) = data.extract::<IndexPriceUpdate>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::IndexPriceUpdate(price)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write IndexPriceUpdate: {e}")));
-        }
-        if let Ok(price) = data.extract::<MarkPriceUpdate>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::MarkPriceUpdate(price)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write MarkPriceUpdate: {e}")));
-        }
-        if let Ok(close) = data.extract::<InstrumentClose>(py) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_data(Data::InstrumentClose(close)).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write InstrumentClose: {e}")));
-        }
-        // Try instrument types (uses type_str attribute for dispatch)
-        if let Ok(instrument) = pyobject_to_instrument_any(py, data.clone_ref(py)) {
-            let mut writer = self.writer.borrow_mut();
-            let runtime = get_runtime();
-            return runtime
-                .block_on(async { writer.write_instrument(instrument).await })
-                .map_err(|e| PyIOError::new_err(format!("Failed to write instrument: {e}")));
-        }
+        let data_enum: Data = if let Ok(quote) = data.extract::<QuoteTick>(py) {
+            Data::Quote(quote)
+        } else if let Ok(trade) = data.extract::<TradeTick>(py) {
+            Data::Trade(trade)
+        } else if let Ok(bar) = data.extract::<Bar>(py) {
+            Data::Bar(bar)
+        } else if let Ok(delta) = data.extract::<OrderBookDelta>(py) {
+            Data::Delta(delta)
+        } else if let Ok(depth) = data.extract::<OrderBookDepth10>(py) {
+            Data::Depth10(Box::new(depth))
+        } else if let Ok(price) = data.extract::<IndexPriceUpdate>(py) {
+            Data::IndexPriceUpdate(price)
+        } else if let Ok(price) = data.extract::<MarkPriceUpdate>(py) {
+            Data::MarkPriceUpdate(price)
+        } else if let Ok(close) = data.extract::<InstrumentClose>(py) {
+            Data::InstrumentClose(close)
+        } else {
+            return Err(PyIOError::new_err(
+                "Unsupported data type. Must be one of: QuoteTick, TradeTick, Bar, OrderBookDelta, OrderBookDepth10, IndexPriceUpdate, MarkPriceUpdate, InstrumentClose",
+            ));
+        };
 
-        Err(PyIOError::new_err(
-            "Unsupported data type for feather writer",
-        ))
+        let mut writer = self.writer.borrow_mut();
+        let runtime = get_runtime();
+
+        runtime
+            .block_on(async { writer.write_data(data_enum).await })
+            .map_err(|e| PyIOError::new_err(format!("Failed to write: {e}")))
     }
 
     /// Flushes all active buffers by writing any remaining buffered bytes to the object store.

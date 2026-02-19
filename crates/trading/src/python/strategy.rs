@@ -16,7 +16,6 @@
 //! Python bindings for Strategy with complete order and position management.
 
 use std::{
-    any::Any,
     cell::{RefCell, UnsafeCell},
     fmt::Debug,
     num::NonZeroUsize,
@@ -45,7 +44,7 @@ use nautilus_core::{
 };
 use nautilus_model::{
     data::{
-        Bar, BarType, DataType, FundingRateUpdate, IndexPriceUpdate, InstrumentStatus,
+        Bar, BarType, CustomData, DataType, FundingRateUpdate, IndexPriceUpdate, InstrumentStatus,
         MarkPriceUpdate, OrderBookDeltas, QuoteTick, TradeTick, close::InstrumentClose,
     },
     enums::{BookType, OmsType, OrderSide, PositionSide, TimeInForce},
@@ -665,9 +664,9 @@ impl DataActor for PyStrategyInner {
     }
 
     #[allow(unused_variables)]
-    fn on_data(&mut self, data: &dyn Any) -> anyhow::Result<()> {
+    fn on_data(&mut self, data: &CustomData) -> anyhow::Result<()> {
         Python::attach(|py| {
-            let py_data = py.None();
+            let py_data: Py<PyAny> = Py::new(py, data.clone())?.into_any();
             self.dispatch_on_data(py_data)
                 .map_err(|e| anyhow::anyhow!("Python on_data failed: {e}"))
         })
@@ -1227,8 +1226,9 @@ impl PyStrategy {
     }
 
     #[pyo3(name = "on_data")]
-    fn py_on_data(&mut self, data: Py<PyAny>) -> PyResult<()> {
-        self.inner_mut().dispatch_on_data(data)
+    fn py_on_data(&mut self, py: Python<'_>, data: CustomData) -> PyResult<()> {
+        self.inner_mut()
+            .dispatch_on_data(Py::new(py, data)?.into_any())
     }
 
     #[pyo3(name = "on_signal")]

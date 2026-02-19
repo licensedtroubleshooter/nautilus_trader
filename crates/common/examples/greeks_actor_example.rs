@@ -25,11 +25,11 @@ use nautilus_common::{
     actor::data_actor::{DataActor, DataActorConfig, DataActorCore},
     cache::Cache,
     component::Component,
-    greeks::GreeksCalculator,
+    greeks::{GreeksCalculator, GreeksData, PortfolioGreeks},
     live::clock::LiveClock,
 };
 use nautilus_model::{
-    data::{PortfolioGreeks, greeks::GreeksData},
+    data::CustomData,
     enums::PositionSide,
     identifiers::{InstrumentId, TraderId},
 };
@@ -173,8 +173,8 @@ impl DataActor for GreeksActor {
         Ok(())
     }
 
-    fn on_data(&mut self, data: &dyn std::any::Any) -> anyhow::Result<()> {
-        if let Some(greeks_data) = data.downcast_ref::<GreeksData>() {
+    fn on_data(&mut self, data: &CustomData) -> anyhow::Result<()> {
+        if let Some(greeks_data) = data.data.as_any().downcast_ref::<GreeksData>() {
             println!("Received greeks data: {greeks_data:?}");
         }
 

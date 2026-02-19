@@ -20,14 +20,19 @@ use std::{cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc};
 use derive_builder::Builder;
 use nautilus_core::UnixNanos;
 use nautilus_model::{
-    data::greeks::{GreeksData, PortfolioGreeks, black_scholes_greeks, imply_vol_and_greeks},
     enums::{InstrumentClass, OptionKind, PositionSide, PriceType},
     identifiers::{InstrumentId, StrategyId, Venue},
     instruments::Instrument,
     position::Position,
 };
 
-use crate::{cache::Cache, clock::Clock, msgbus, msgbus::TypedHandler};
+use crate::{
+    cache::Cache,
+    clock::Clock,
+    greeks::data::{GreeksData, PortfolioGreeks, black_scholes_greeks, imply_vol_and_greeks},
+    msgbus,
+    msgbus::TypedHandler,
+};
 
 /// Type alias for a greeks filter function.
 pub type GreeksFilter = Box<dyn Fn(&GreeksData) -> bool>;
@@ -368,7 +373,7 @@ impl GreeksCalculator {
                 .unwrap_or_default()
                 .as_f64();
             let (delta, _, _) = self.modify_greeks(
-                1.0,
+                multiplier.as_f64(),
                 0.0,
                 underlying_instrument_id,
                 underlying_price + spot_shock,
@@ -382,10 +387,10 @@ impl GreeksCalculator {
                 None,
             );
             let mut greeks_data =
-                GreeksData::from_delta(instrument_id, delta, multiplier.as_f64(), ts_event);
+                GreeksData::from_delta_rust(instrument_id, delta, multiplier.as_f64(), ts_event);
 
             if let Some(pos) = position {
-                greeks_data.pnl = (underlying_price + spot_shock) - pos.avg_px_open;
+                greeks_data.pnl = multiplier * ((underlying_price + spot_shock) - pos.avg_px_open);
                 greeks_data.price = greeks_data.pnl;
             }
 
@@ -419,7 +424,7 @@ impl GreeksCalculator {
                 .to_string()
                 .parse::<i32>()
                 .unwrap_or(0);
-            let expiry_in_days = (expiry_utc - utc_now).num_days().min(1) as i32;
+            let expiry_in_days = (expiry_utc - utc_now).num_days().max(1) as i32;
             let expiry_in_years = expiry_in_days as f64 / 365.25;
             let currency = instrument.quote_currency().code.to_string();
             let interest_rate = match cache.yield_curve(&currency) {
@@ -1171,7 +1176,7 @@ mod tests {
         let filter = GreeksFilterCallback::from_fn(filter_positive_delta);
 
         // Create test data
-        let greeks_data = GreeksData::from_delta(
+        let greeks_data = GreeksData::from_delta_rust(
             InstrumentId::from("TEST.NASDAQ"),
             0.5,
             1.0,
@@ -1193,7 +1198,7 @@ mod tests {
             GreeksFilterCallback::from_closure(move |data: &GreeksData| data.delta > min_delta);
 
         // Create test data
-        let greeks_data = GreeksData::from_delta(
+        let greeks_data = GreeksData::from_delta_rust(
             InstrumentId::from("TEST.NASDAQ"),
             0.5,
             1.0,
@@ -1216,7 +1221,7 @@ mod tests {
         let filter1 = GreeksFilterCallback::from_fn(filter_fn);
         let filter2 = filter1.clone();
 
-        let greeks_data = GreeksData::from_delta(
+        let greeks_data = GreeksData::from_delta_rust(
             InstrumentId::from("TEST.NASDAQ"),
             0.5,
             1.0,
@@ -1245,7 +1250,7 @@ mod tests {
         assert_eq!(params.flat_interest_rate, 0.05);
 
         // Test that the filter can be called
-        let greeks_data = GreeksData::from_delta(
+        let greeks_data = GreeksData::from_delta_rust(
             InstrumentId::from("TEST.NASDAQ"),
             0.5,
             1.0,
@@ -1283,7 +1288,7 @@ mod tests {
         let callback = GreeksFilterCallback::from_fn(filter_fn);
         let greeks_filter = callback.to_greeks_filter();
 
-        let greeks_data = GreeksData::from_delta(
+        let greeks_data = GreeksData::from_delta_rust(
             InstrumentId::from("TEST.NASDAQ"),
             0.5,
             1.0,

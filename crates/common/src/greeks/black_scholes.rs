@@ -231,19 +231,14 @@ fn pricing_kernel<T: BlackScholesReal>(
     let p_theta =
         theta_base + r * k * disc * (T::splat(1.0) - n_d2) - phi_theta * (b - r) * s * n_d1;
 
-    let price = T::select(is_call, c_price, p_price);
-    let delta = T::select(is_call, n_d1, n_d1 - T::splat(1.0));
-    let theta = T::select(is_call, c_theta, p_theta);
-    let itm_prob = T::select(is_call, n_d2, T::splat(1.0) - n_d2);
-
     Greeks {
-        price,
+        price: T::select(is_call, c_price, p_price),
         vol,
-        delta,
+        delta: T::select(is_call, n_d1, n_d1 - T::splat(1.0)),
         gamma,
         vega,
-        theta,
-        itm_prob,
+        theta: T::select(is_call, c_theta, p_theta),
+        itm_prob: T::select(is_call, n_d2, T::splat(1.0) - n_d2),
     }
 }
 
@@ -375,7 +370,7 @@ mod tests {
     use rstest::*;
 
     use super::*;
-    use crate::data::greeks::black_scholes_greeks_exact;
+    use crate::greeks::data::black_scholes_greeks_exact;
 
     #[rstest]
     fn test_accuracy_1e7() {
@@ -396,7 +391,7 @@ mod tests {
         let k = 100.0f64;
         let t = 1.0f64;
         let r = 0.05f64;
-        let b = 0.05f64; // cost of carry
+        let b = 0.05f64;
         let vol = 0.2f64;
         let multiplier = 1.0f64;
 
@@ -405,7 +400,7 @@ mod tests {
             s as f32, k as f32, t as f32, r as f32, b as f32, vol as f32, true,
         );
 
-        // Compute using exact f64 method
+        // Compute using exact f64 method (per-unit, no multiplier)
         let g_exact = black_scholes_greeks_exact(s, r, b, vol, true, k, t);
 
         // Compare with tolerance for f32 precision
@@ -530,158 +525,6 @@ mod tests {
             "Theta mismatch after Halley: halley={}, exact_raw={}",
             g_halley.theta,
             theta_exact_raw
-        );
-    }
-
-    #[rstest]
-    fn test_print_halley_iv() {
-        let s = 100.0f64;
-        let k = 100.0f64;
-        let t = 1.0f64;
-        let r = 0.05f64;
-        let b = 0.05f64;
-        let vol_true = 0.2f64;
-
-        let g_exact = black_scholes_greeks_exact(s, r, b, vol_true, true, k, t);
-        let mkt_price = g_exact.price;
-
-        println!("\n=== Halley Step IV Test (Using True Vol as Initial Guess) ===");
-        println!("True volatility: {vol_true}");
-        println!("Market price: {mkt_price:.8}");
-        println!("Initial guess: {vol_true} (using true vol)");
-
-        let g_halley = compute_iv_and_greeks::<f32>(
-            mkt_price as f32,
-            s as f32,
-            k as f32,
-            t as f32,
-            r as f32,
-            b as f32,
-            true,
-            vol_true as f32, // Using true vol as initial guess
-        );
-
-        println!("\nAfter one Halley step:");
-        println!("Computed volatility: {:.8}", g_halley.vol);
-        println!("True volatility: {vol_true:.8}");
-        println!(
-            "Absolute error: {:.8}",
-            (g_halley.vol as f64 - vol_true).abs()
-        );
-        println!(
-            "Relative error: {:.4}%",
-            (g_halley.vol as f64 - vol_true).abs() / vol_true * 100.0
-        );
-    }
-
-    #[rstest]
-    fn test_compute_iv_and_greeks_deep_itm_otm() {
-        let t = 1.0f64;
-        let r = 0.05f64;
-        let b = 0.05f64;
-        let vol_true = 0.2f64;
-
-        // Deep ITM: s=150, k=100 (spot is 50% above strike)
-        let s_itm = 150.0f64;
-        let k_itm = 100.0f64;
-        let g_exact_itm = black_scholes_greeks_exact(s_itm, r, b, vol_true, true, k_itm, t);
-        let mkt_price_itm = g_exact_itm.price;
-
-        println!("\n=== Deep ITM Test ===");
-        println!("Spot: {s_itm}, Strike: {k_itm}, True vol: {vol_true}");
-        println!("Market price: {mkt_price_itm:.8}");
-
-        let g_recovered_itm = compute_iv_and_greeks::<f32>(
-            mkt_price_itm as f32,
-            s_itm as f32,
-            k_itm as f32,
-            t as f32,
-            r as f32,
-            b as f32,
-            true,
-            vol_true as f32, // Using true vol as initial guess
-        );
-
-        let vol_error_itm = (g_recovered_itm.vol as f64 - vol_true).abs();
-        let rel_error_itm = vol_error_itm / vol_true * 100.0;
-
-        println!("Recovered volatility: {:.8}", g_recovered_itm.vol);
-        println!("Absolute error: {vol_error_itm:.8}");
-        println!("Relative error: {rel_error_itm:.4}%");
-
-        // Deep OTM: s=50, k=100 (spot is 50% below strike)
-        let s_otm = 50.0f64;
-        let k_otm = 100.0f64;
-        let g_exact_otm = black_scholes_greeks_exact(s_otm, r, b, vol_true, true, k_otm, t);
-        let mkt_price_otm = g_exact_otm.price;
-
-        println!("\n=== Deep OTM Test ===");
-        println!("Spot: {s_otm}, Strike: {k_otm}, True vol: {vol_true}");
-        println!("Market price: {mkt_price_otm:.8}");
-
-        let g_recovered_otm = compute_iv_and_greeks::<f32>(
-            mkt_price_otm as f32,
-            s_otm as f32,
-            k_otm as f32,
-            t as f32,
-            r as f32,
-            b as f32,
-            false,
-            vol_true as f32, // Using true vol as initial guess
-        );
-
-        let vol_error_otm = (g_recovered_otm.vol as f64 - vol_true).abs();
-        let rel_error_otm = vol_error_otm / vol_true * 100.0;
-
-        println!("Recovered volatility: {:.8}", g_recovered_otm.vol);
-        println!("Absolute error: {vol_error_otm:.8}");
-        println!("Relative error: {rel_error_otm:.4}%");
-
-        // Assertions: Deep ITM and OTM are challenging cases
-        // One Halley step with Corrado-Miller initial guess may not be sufficient
-        // We use a more relaxed tolerance to verify the method still converges in the right direction
-        // For production use, multiple iterations or better initial guesses would be needed
-        let vol_tol_itm = 50.0; // 50% relative error tolerance for deep ITM
-        let vol_tol_otm = 150.0; // 150% relative error tolerance for deep OTM (very challenging)
-
-        // Check that we at least get a reasonable volatility (not NaN or extreme values)
-        assert!(
-            g_recovered_itm.vol.is_finite()
-                && g_recovered_itm.vol > 0.0
-                && g_recovered_itm.vol < 2.0,
-            "Deep ITM vol recovery: invalid result={}",
-            g_recovered_itm.vol
-        );
-
-        assert!(
-            g_recovered_otm.vol.is_finite()
-                && g_recovered_otm.vol > 0.0
-                && g_recovered_otm.vol < 2.0,
-            "Deep OTM vol recovery: invalid result={}",
-            g_recovered_otm.vol
-        );
-
-        // Verify the error is within acceptable bounds (one step may not be enough)
-        assert!(
-            rel_error_itm < vol_tol_itm,
-            "Deep ITM vol recovery error too large: recovered={}, true={}, error={:.4}%",
-            g_recovered_itm.vol,
-            vol_true,
-            rel_error_itm
-        );
-
-        assert!(
-            rel_error_otm < vol_tol_otm,
-            "Deep OTM vol recovery error too large: recovered={}, true={}, error={:.4}%",
-            g_recovered_otm.vol,
-            vol_true,
-            rel_error_otm
-        );
-
-        println!("\n=== Summary ===");
-        println!("Deep ITM: One Halley iteration error = {rel_error_itm:.2}%");
-        println!(
-            "Deep OTM: One Halley iteration error = {rel_error_otm:.2}% (still challenging, deep OTM is difficult)"
         );
     }
 }

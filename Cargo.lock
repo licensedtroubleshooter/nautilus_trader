@@ -5150,6 +5150,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "arraydeque",
+ "arrow",
  "async-stream",
  "async-trait",
  "bytes",
@@ -5160,10 +5161,12 @@ dependencies = [
  "derive_builder",
  "futures",
  "iai",
+ "implied-vol",
  "indexmap 2.13.0",
  "log",
  "nautilus-core",
  "nautilus-indicators",
+ "nautilus-macros",
  "nautilus-model",
  "nautilus-serialization",
  "proptest",
@@ -5489,6 +5492,8 @@ dependencies = [
  "nautilus-core",
  "nautilus-cryptography",
  "nautilus-model",
+ "nautilus-persistence",
+ "nautilus-serialization",
  "pyo3",
  "pyo3-async-runtimes",
  "pyo3-stub-gen",
@@ -5582,12 +5587,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "nautilus-macros"
+version = "0.53.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.116",
+]
+
+[[package]]
 name = "nautilus-model"
 version = "0.53.0"
 dependencies = [
  "ahash 0.8.12",
  "alloy-primitives",
  "anyhow",
+ "arrow",
  "cbindgen",
  "chrono",
  "criterion",
@@ -5596,7 +5611,6 @@ dependencies = [
  "evalexpr",
  "hex",
  "iai",
- "implied-vol",
  "indexmap 2.13.0",
  "log",
  "nautilus-core",
@@ -5714,10 +5728,12 @@ dependencies = [
  "datafusion",
  "futures",
  "heck",
+ "indexmap 2.13.0",
  "itertools 0.14.0",
  "log",
  "nautilus-common",
  "nautilus-core",
+ "nautilus-macros",
  "nautilus-model",
  "nautilus-serialization",
  "nautilus-testkit",
@@ -5839,6 +5855,7 @@ dependencies = [
 name = "nautilus-serialization"
 version = "0.53.0"
 dependencies = [
+ "anyhow",
  "arrow",
  "capnp 0.25.1",
  "capnpc",

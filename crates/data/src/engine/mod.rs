@@ -78,8 +78,9 @@ use nautilus_core::{
 use nautilus_model::defi::DefiData;
 use nautilus_model::{
     data::{
-        Bar, BarType, Data, DataType, FundingRateUpdate, IndexPriceUpdate, InstrumentClose,
-        MarkPriceUpdate, OrderBookDelta, OrderBookDeltas, OrderBookDepth10, QuoteTick, TradeTick,
+        Bar, BarType, CustomData, Data, DataType, FundingRateUpdate, IndexPriceUpdate,
+        InstrumentClose, MarkPriceUpdate, OrderBookDelta, OrderBookDeltas, OrderBookDepth10,
+        QuoteTick, TradeTick,
     },
     enums::{AggregationSource, BarAggregation, BookType, PriceType, RecordFlag},
     identifiers::{ClientId, InstrumentId, Venue},
@@ -861,6 +862,7 @@ impl DataEngine {
             Data::MarkPriceUpdate(mark_price) => self.handle_mark_price(mark_price),
             Data::IndexPriceUpdate(index_price) => self.handle_index_price(index_price),
             Data::InstrumentClose(close) => self.handle_instrument_close(close),
+            Data::Custom(custom) => self.handle_custom_data(custom),
         }
     }
 
@@ -1082,6 +1084,12 @@ impl DataEngine {
     fn handle_instrument_close(&mut self, close: InstrumentClose) {
         let topic = switchboard::get_instrument_close_topic(close.instrument_id);
         msgbus::publish_any(topic, &close);
+    }
+
+    fn handle_custom_data(&mut self, custom: CustomData) {
+        log::debug!("Processing custom data: {}", custom.data.type_name());
+        let topic = switchboard::get_custom_topic(&custom.data_type);
+        msgbus::publish_any(topic, &custom);
     }
 
     // -- SUBSCRIPTION HANDLERS -------------------------------------------------------------------

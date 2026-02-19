@@ -63,6 +63,7 @@ pub mod custom;
 pub mod enums;
 pub mod factories;
 pub mod generators;
+#[cfg(feature = "greeks")]
 pub mod greeks;
 pub mod logging;
 pub mod messages;

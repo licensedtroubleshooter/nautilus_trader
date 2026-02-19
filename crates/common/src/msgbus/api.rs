@@ -32,8 +32,8 @@ use nautilus_model::defi::{
 };
 use nautilus_model::{
     data::{
-        Bar, Data, FundingRateUpdate, GreeksData, IndexPriceUpdate, MarkPriceUpdate,
-        OrderBookDeltas, OrderBookDepth10, QuoteTick, TradeTick,
+        Bar, Data, FundingRateUpdate, IndexPriceUpdate, MarkPriceUpdate, OrderBookDeltas,
+        OrderBookDepth10, QuoteTick, TradeTick,
     },
     events::{AccountState, OrderEventAny, PositionEvent},
     orderbook::OrderBook,
@@ -43,11 +43,13 @@ use nautilus_model::{
 use smallvec::SmallVec;
 use ustr::Ustr;
 
+#[cfg(feature = "greeks")]
+use super::GREEKS_HANDLERS;
 use super::{
     ACCOUNT_STATE_HANDLERS, ANY_HANDLERS, BAR_HANDLERS, BOOK_HANDLERS, DELTAS_HANDLERS,
-    DEPTH10_HANDLERS, FUNDING_RATE_HANDLERS, GREEKS_HANDLERS, HANDLER_BUFFER_CAP,
-    INDEX_PRICE_HANDLERS, MARK_PRICE_HANDLERS, MESSAGE_BUS, ORDER_EVENT_HANDLERS,
-    POSITION_EVENT_HANDLERS, QUOTE_HANDLERS, TRADE_HANDLERS,
+    DEPTH10_HANDLERS, FUNDING_RATE_HANDLERS, HANDLER_BUFFER_CAP, INDEX_PRICE_HANDLERS,
+    MARK_PRICE_HANDLERS, MESSAGE_BUS, ORDER_EVENT_HANDLERS, POSITION_EVENT_HANDLERS,
+    QUOTE_HANDLERS, TRADE_HANDLERS,
     core::{MessageBus, Subscription},
     get_message_bus,
     matching::is_matching_backtracking,
@@ -59,6 +61,8 @@ use super::{
     DEFI_BLOCK_HANDLERS, DEFI_COLLECT_HANDLERS, DEFI_FLASH_HANDLERS, DEFI_LIQUIDITY_HANDLERS,
     DEFI_POOL_HANDLERS, DEFI_SWAP_HANDLERS,
 };
+#[cfg(feature = "greeks")]
+use crate::greeks::GreeksData;
 use crate::messages::{
     data::{DataCommand, DataResponse},
     execution::{ExecutionReport, TradingCommand},
@@ -368,6 +372,7 @@ pub fn subscribe_funding_rates(
 }
 
 /// Subscribes a handler to greeks data matching a pattern.
+#[cfg(feature = "greeks")]
 pub fn subscribe_greeks(
     pattern: MStr<Pattern>,
     handler: TypedHandler<GreeksData>,
@@ -652,6 +657,7 @@ pub fn unsubscribe_positions(pattern: MStr<Pattern>, handler: &TypedHandler<Posi
 }
 
 /// Unsubscribes a handler from greeks data.
+#[cfg(feature = "greeks")]
 pub fn unsubscribe_greeks(pattern: MStr<Pattern>, handler: &TypedHandler<GreeksData>) {
     get_message_bus()
         .borrow_mut()
@@ -886,6 +892,7 @@ pub fn publish_funding_rate(topic: MStr<Topic>, funding_rate: &FundingRateUpdate
 }
 
 /// Publishes greeks data to subscribers on a topic.
+#[cfg(feature = "greeks")]
 pub fn publish_greeks(topic: MStr<Topic>, greeks: &GreeksData) {
     publish_typed(
         &GREEKS_HANDLERS,

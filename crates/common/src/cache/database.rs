@@ -24,7 +24,7 @@ use bytes::Bytes;
 use nautilus_core::UnixNanos;
 use nautilus_model::{
     accounts::AccountAny,
-    data::{Bar, DataType, FundingRateUpdate, GreeksData, QuoteTick, TradeTick, YieldCurveData},
+    data::{Bar, CustomData, DataType, FundingRateUpdate, QuoteTick, TradeTick},
     events::{OrderEventAny, OrderSnapshot, position::snapshot::PositionSnapshot},
     identifiers::{
         AccountId, ClientId, ClientOrderId, ComponentId, InstrumentId, PositionId, StrategyId,
@@ -38,7 +38,9 @@ use nautilus_model::{
 };
 use ustr::Ustr;
 
-use crate::{custom::CustomData, signal::Signal};
+#[cfg(feature = "greeks")]
+use crate::greeks::{GreeksData, YieldCurveData};
+use crate::signal::Signal;
 
 #[derive(Debug, Default)]
 pub struct CacheMap {
@@ -48,7 +50,9 @@ pub struct CacheMap {
     pub accounts: AHashMap<AccountId, AccountAny>,
     pub orders: AHashMap<ClientOrderId, OrderAny>,
     pub positions: AHashMap<PositionId, Position>,
+    #[cfg(feature = "greeks")]
     pub greeks: AHashMap<InstrumentId, GreeksData>,
+    #[cfg(feature = "greeks")]
     pub yield_curves: AHashMap<String, YieldCurveData>,
 }
 
@@ -129,6 +133,7 @@ pub trait CacheDatabaseAdapter {
     /// # Errors
     ///
     /// Returns an error if loading greeks data fails.
+    #[cfg(feature = "greeks")]
     async fn load_greeks(&self) -> anyhow::Result<AHashMap<InstrumentId, GreeksData>> {
         Ok(AHashMap::new())
     }
@@ -138,6 +143,7 @@ pub trait CacheDatabaseAdapter {
     /// # Errors
     ///
     /// Returns an error if loading yield curve data fails.
+    #[cfg(feature = "greeks")]
     async fn load_yield_curves(&self) -> anyhow::Result<AHashMap<String, YieldCurveData>> {
         Ok(AHashMap::new())
     }
@@ -401,6 +407,7 @@ pub trait CacheDatabaseAdapter {
     /// # Errors
     ///
     /// Returns an error if adding greeks data fails.
+    #[cfg(feature = "greeks")]
     fn add_greeks(&self, greeks: &GreeksData) -> anyhow::Result<()> {
         Ok(())
     }
@@ -410,6 +417,7 @@ pub trait CacheDatabaseAdapter {
     /// # Errors
     ///
     /// Returns an error if adding yield curve data fails.
+    #[cfg(feature = "greeks")]
     fn add_yield_curve(&self, yield_curve: &YieldCurveData) -> anyhow::Result<()> {
         Ok(())
     }

@@ -13,8 +13,10 @@
 #  limitations under the License.
 # -------------------------------------------------------------------------------------------------
 
+import json
 import sys
 from dataclasses import dataclass
+from io import BytesIO
 from typing import Any
 
 import msgspec
@@ -95,6 +97,7 @@ def customdataclass(*args, **kwargs):  # noqa: C901 (too complex)
                     annotations = self.__class__.__annotate__(1)  # 1 = eval annotations
                 else:
                     annotations = getattr(self.__class__, "__annotations__", {})
+
                 result = {attr: getattr(self, attr) for attr in annotations}
 
                 if hasattr(self, "instrument_id"):
@@ -113,6 +116,7 @@ def customdataclass(*args, **kwargs):  # noqa: C901 (too complex)
             @classmethod
             def from_dict(cls, data: dict[str, Any]) -> cls:
                 data.pop("type", None)
+                data.pop("data_type", None)
 
                 if "instrument_id" in data:
                     data["instrument_id"] = InstrumentId.from_str(data["instrument_id"])
@@ -176,6 +180,85 @@ def customdataclass(*args, **kwargs):  # noqa: C901 (too complex)
 
         register_serializable_type(cls, cls.to_dict, cls.from_dict)
         register_arrow(cls, cls._schema, cls.to_arrow, cls.from_arrow)
+
+        return cls
+
+    if args and callable(args[0]):
+        return wrapper(args[0])
+
+    return wrapper
+
+
+def customdataclass_pyo3(*args, **kwargs):  # noqa: C901 (too complex)
+    """
+    Extend customdataclass with methods required for the PyO3 (Rust) catalog.
+
+    Use this when you want to write/query custom data via ParquetDataCatalogV2
+    (nautilus_pyo3). After defining your class, register it once by type:
+
+        from nautilus_trader.core.nautilus_pyo3.model import register_custom_data_class
+        register_custom_data_class(MyClass)
+
+    Then use catalog.write_custom_data([...]) and catalog.query("MyClass", ...).
+
+    """
+
+    def wrapper(cls):  # noqa: C901 (too complex)
+        cls = customdataclass(*args, **kwargs)(cls)
+
+        if "to_json" not in cls.__dict__:
+
+            def to_json(self) -> str:
+                return json.dumps(self.to_dict())
+
+            cls.to_json = to_json
+
+        if "from_json" not in cls.__dict__:
+
+            @classmethod
+            def from_json(cls_inner, data: dict[str, Any]) -> Any:
+                return cls_inner.from_dict(data)
+
+            cls.from_json = from_json
+
+        if "type_name_static" not in cls.__dict__:
+
+            @classmethod
+            def type_name_static(cls_inner) -> str:
+                return cls_inner.__name__
+
+            cls.type_name_static = type_name_static
+
+        if "encode_record_batch_py" not in cls.__dict__:
+
+            def encode_record_batch_py(self, items: list) -> bytes:
+                if not hasattr(self.__class__, "_schema"):
+                    msg = (
+                        f"{self.__class__.__name__}: _schema not set. "
+                        "Register the type with register_custom_data_class(...) so the "
+                        "catalog can encode record batches."
+                    )
+                    raise AttributeError(msg)
+                dicts = [x.to_dict() for x in items]
+                batch = pa.RecordBatch.from_pylist(dicts, schema=self.__class__._schema)
+                sink = pa.BufferOutputStream()
+                # Use file format (with footer) so Rust FileReader can read it
+                with pa.ipc.new_file(sink, batch.schema) as writer:
+                    writer.write_batch(batch)
+                return sink.getvalue().to_pybytes()
+
+            cls.encode_record_batch_py = encode_record_batch_py
+
+        if "decode_record_batch_py" not in cls.__dict__:
+
+            @classmethod
+            def decode_record_batch_py(cls_inner, metadata: dict, ipc_bytes: bytes) -> list:
+                # Use file format reader to match Rust FileWriter output
+                reader = pa.ipc.open_file(BytesIO(ipc_bytes))
+                table = reader.read_all()
+                return [cls_inner.from_dict(d) for d in table.to_pylist()]
+
+            cls.decode_record_batch_py = decode_record_batch_py
 
         return cls
 

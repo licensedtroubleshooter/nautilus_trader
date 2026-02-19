@@ -59,6 +59,15 @@ pub fn model(_: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Data
     m.add_function(wrap_pyfunction!(data::drop_cvec_pycapsule, m)?)?;
     m.add_class::<crate::data::DataType>()?;
+    m.add_class::<crate::data::CustomData>()?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        crate::python::data::deserialize_custom_from_json,
+        m
+    )?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        crate::python::data::register_custom_data_class,
+        m
+    )?)?;
     m.add_class::<crate::data::bar::BarSpecification>()?;
     m.add_class::<crate::data::bar::BarType>()?;
     m.add_class::<crate::data::bar::Bar>()?;
@@ -75,23 +84,6 @@ pub fn model(_: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<crate::data::trade::TradeTick>()?;
     m.add_class::<crate::data::close::InstrumentClose>()?;
     m.add_class::<crate::data::funding::FundingRateUpdate>()?;
-    m.add_class::<crate::data::greeks::BlackScholesGreeksResult>()?;
-    m.add_function(wrap_pyfunction!(
-        crate::python::data::greeks::py_black_scholes_greeks,
-        m
-    )?)?;
-    m.add_function(wrap_pyfunction!(
-        crate::python::data::greeks::py_imply_vol,
-        m
-    )?)?;
-    m.add_function(wrap_pyfunction!(
-        crate::python::data::greeks::py_imply_vol_and_greeks,
-        m
-    )?)?;
-    m.add_function(wrap_pyfunction!(
-        crate::python::data::greeks::py_refine_vol_and_greeks,
-        m
-    )?)?;
     // Enums
     m.add_class::<crate::enums::AccountType>()?;
     m.add_class::<crate::enums::AggregationSource>()?;

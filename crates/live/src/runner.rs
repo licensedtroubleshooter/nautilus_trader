@@ -430,7 +430,7 @@ mod tests {
         let command = DataCommand::Subscribe(SubscribeCommand::Data(SubscribeCustomData {
             client_id: Some(ClientId::from("TEST")),
             venue: None,
-            data_type: DataType::new("QuoteTick", None),
+            data_type: DataType::new("QuoteTick", None, None),
             command_id: UUID4::new(),
             ts_init: UnixNanos::default(),
             correlation_id: None,
@@ -960,7 +960,7 @@ mod tests {
         let command = DataCommand::Subscribe(SubscribeCommand::Data(SubscribeCustomData {
             client_id: Some(ClientId::from("TEST")),
             venue: None,
-            data_type: DataType::new("QuoteTick", None),
+            data_type: DataType::new("QuoteTick", None, None),
             command_id: UUID4::new(),
             ts_init: UnixNanos::default(),
             correlation_id: None,
